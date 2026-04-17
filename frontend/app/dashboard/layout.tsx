@@ -1,18 +1,11 @@
 "use client";
 
-import Sidebar from "@/components/Sidebar";
+import { AppShell } from "@/components/layout/app-shell";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <div className="flex">
-      <Sidebar />
-      <main className="flex-1 p-4 sm:p-6 lg:p-10 bg-slate-100 min-h-screen">
-        {children}
-      </main>
-    </div>
-  );
+  return <AppShell>{children}</AppShell>;
 }

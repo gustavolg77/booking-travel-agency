@@ -1,21 +1,21 @@
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
-import healthRoutes from "./modules/health/health.routes";
-import authRoutes from "./modules/auth/auth.routes";
+import { corsOptions } from "./config/cors";
 import { authenticate } from "./middlewares/auth.middlewares";
-
-dotenv.config();
+import { errorHandler } from "./core/middlewares/error-handler";
+import { notFoundHandler } from "./core/middlewares/not-found";
+import { publicRouter } from "./routes";
 
 const app = express();
 
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
-app.use("/api/auth", authRoutes); // público
+app.use("/api", publicRouter);
 
-app.use(authenticate); // 🔒 todo lo que sigue es privado
+app.use("/api/private", authenticate);
 
-app.use("/api/health", healthRoutes);
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 export default app;

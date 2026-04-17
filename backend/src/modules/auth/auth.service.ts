@@ -1,34 +1,28 @@
 import prisma from "../../config/prisma";
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
-const JWT_SECRET = "supersecretkey"; // luego lo pasaremos a .env
+import { AppError } from "../../core/errors/app-error";
+import { comparePassword } from "../../shared/utils/password";
+import { signAccessToken } from "../../shared/utils/jwt";
+import { LoginInput } from "./auth.types";
 
-export const loginUser = async (email: string, password: string) => {
-  // 1️⃣ Buscar usuario por email
+export async function loginUser({ email, password }: LoginInput) {
   const user = await prisma.user.findUnique({
     where: { email },
   });
 
   if (!user) {
-    throw new Error("Invalid credentials");
+    throw new AppError("Invalid credentials", 401);
   }
 
-  // 2️⃣ Comparar contraseña
-  const isPasswordValid = await bcrypt.compare(password, user.password);
+  const isPasswordValid = await comparePassword(password, user.password);
 
   if (!isPasswordValid) {
-    throw new Error("Invalid credentials");
+    throw new AppError("Invalid credentials", 401);
   }
 
-  // 3️⃣ Generar token
-  const token = jwt.sign(
-    {
-      userId: user.id,
-      role: user.role,
-    },
-    JWT_SECRET,
-    { expiresIn: "8h" }
-  );
+  const token = signAccessToken({
+    userId: user.id,
+    role: user.role,
+  });
 
   return {
     token,
@@ -39,4 +33,4 @@ export const loginUser = async (email: string, password: string) => {
       role: user.role,
     },
   };
-};
+}

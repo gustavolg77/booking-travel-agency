@@ -1,12 +1,7 @@
 import { Request, Response } from "express";
-import prisma from "../../config/prisma";
+import { getHealthStatus } from "./health.service";
 
-export const healthCheck = async (req: Request, res: Response) => {
-  const usersCount = await prisma.user.count();
-
-  res.status(200).json({
-    status: "OK",
-    message: "API working correctly 🚀",
-    usersInDatabase: usersCount,
-  });
-};
+export async function healthCheck(_req: Request, res: Response) {
+  const data = await getHealthStatus();
+  return res.status(200).json(data);
+}

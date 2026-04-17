@@ -1,8 +1,8 @@
 import prisma from "../src/config/prisma";
-import bcrypt from "bcrypt";
+import { hashPassword } from "../src/shared/utils/password";
 
 async function main() {
-  console.log("🌱 Seeding database...");
+  console.log("Seeding database...");
 
   const users = [
     {
@@ -31,29 +31,28 @@ async function main() {
     });
 
     if (!existingUser) {
-      const hashedPassword = await bcrypt.hash(userData.password, 10);
-
       await prisma.user.create({
         data: {
           name: userData.name,
           email: userData.email,
-          password: hashedPassword,
-          role: userData.role as any,
+          password: await hashPassword(userData.password),
+          role: userData.role as "ADMIN" | "AGENT",
         },
       });
 
-      console.log(`✅ Created: ${userData.email}`);
+      console.log(`Created: ${userData.email}`);
     } else {
-      console.log(`⚠️ Already exists: ${userData.email}`);
+      console.log(`Already exists: ${userData.email}`);
     }
   }
 
-  console.log("🌱 Seeding completed.");
+  console.log("Seed completed.");
 }
 
 main()
   .catch((error) => {
     console.error(error);
+    process.exit(1);
   })
   .finally(async () => {
     await prisma.$disconnect();

@@ -1,38 +1,25 @@
-import { Request, Response, NextFunction } from "express";
-import jwt from "jsonwebtoken";
+import { Response, NextFunction } from "express";
+import { AppError } from "../core/errors/app-error";
+import { AuthRequest } from "../shared/types/auth-request";
+import { verifyAccessToken } from "../shared/utils/jwt";
 
-const JWT_SECRET = "supersecretkey"; // luego lo moveremos a .env
-
-export interface AuthRequest extends Request {
-  user?: {
-    userId: string;
-    role: string;
-  };
-}
-
-export const authenticate = (
+export function authenticate(
   req: AuthRequest,
-  res: Response,
+  _res: Response,
   next: NextFunction
-) => {
+) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return res.status(401).json({ message: "Unauthorized" });
+    return next(new AppError("Unauthorized", 401));
   }
 
   const token = authHeader.split(" ")[1];
 
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as {
-      userId: string;
-      role: string;
-    };
-
-    req.user = decoded;
-
+    req.user = verifyAccessToken(token);
     next();
-  } catch (error) {
-    return res.status(401).json({ message: "Invalid token" });
+  } catch {
+    next(new AppError("Invalid token", 401));
   }
-};
+}
