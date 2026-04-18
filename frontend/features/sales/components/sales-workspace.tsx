@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { lookupClientByDocument } from "@/features/clients/api/clients";
 import { createSale, listSales } from "@/features/sales/api/sales";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -9,6 +10,7 @@ import { ClientListItem, DocumentType } from "@/types/client";
 import { CreateSalePayload, PaymentMethod, Sale } from "@/types/sale";
 
 type ClientMode = "existing" | "new";
+type ActiveModal = "confirm" | "cancel" | null;
 
 interface SaleFormItem {
   passengerFirstName: string;
@@ -43,6 +45,7 @@ const emptyItem = (): SaleFormItem => ({
 });
 
 export function SalesWorkspace() {
+  const router = useRouter();
   const [clientMode, setClientMode] = useState<ClientMode>("existing");
   const [documentType, setDocumentType] = useState<DocumentType>("CI");
   const [documentNumber, setDocumentNumber] = useState("");
@@ -70,6 +73,8 @@ export function SalesWorkspace() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [latestSaleId, setLatestSaleId] = useState<string | null>(null);
+  const [activeModal, setActiveModal] = useState<ActiveModal>(null);
 
   const loadSales = useCallback(async () => {
     setLoadingSales(true);
@@ -99,7 +104,9 @@ export function SalesWorkspace() {
       setLookupMessage("Cliente encontrado y cargado correctamente.");
     } catch {
       setSelectedClient(null);
-      setLookupMessage("No existe un cliente con ese documento. Puedes registrarlo en la misma venta.");
+      setLookupMessage(
+        "No existe un cliente con ese documento. Puedes registrarlo en la misma venta."
+      );
       setClientMode("new");
       setNewClient((current) => ({
         ...current,
@@ -142,6 +149,14 @@ export function SalesWorkspace() {
     0
   );
 
+  const customerName = useMemo(() => {
+    if (selectedClient) {
+      return `${selectedClient.firstName} ${selectedClient.lastName}`;
+    }
+
+    return `${newClient.firstName || "-"} ${newClient.lastName || ""}`.trim();
+  }, [newClient.firstName, newClient.lastName, selectedClient]);
+
   const resetForm = () => {
     setClientMode("existing");
     setSelectedClient(null);
@@ -165,11 +180,7 @@ export function SalesWorkspace() {
     setItems([emptyItem()]);
   };
 
-  const handleSubmit = async () => {
-    setSubmitting(true);
-    setError("");
-    setSuccess("");
-
+  const buildPayload = (): CreateSalePayload => {
     const payload: CreateSalePayload = {
       saleDate,
       paymentMethod,
@@ -202,22 +213,19 @@ export function SalesWorkspace() {
       };
     }
 
-    const shouldContinue = window.confirm(
-      `Confirmar venta para ${
-        selectedClient
-          ? `${selectedClient.firstName} ${selectedClient.lastName}`
-          : `${newClient.firstName} ${newClient.lastName}`
-      } con ${items.length} pasajero(s) por ${formatMoney(totalClient)}`
-    );
+    return payload;
+  };
 
-    if (!shouldContinue) {
-      setSubmitting(false);
-      return;
-    }
+  const handleConfirmSale = async () => {
+    setSubmitting(true);
+    setError("");
+    setSuccess("");
 
     try {
-      const sale = await createSale(payload);
+      const sale = await createSale(buildPayload());
+      setLatestSaleId(sale.id);
       setSuccess(`Venta ${sale.saleNumber} registrada correctamente.`);
+      setActiveModal(null);
       resetForm();
       await loadSales();
     } catch (err: unknown) {
@@ -227,23 +235,56 @@ export function SalesWorkspace() {
     }
   };
 
+  const canSubmit =
+    items.length > 0 &&
+    items.every(
+      (item) =>
+        item.passengerFirstName &&
+        item.passengerLastName &&
+        item.routeOrigin &&
+        item.routeDestination &&
+        item.amountClient
+    ) &&
+    ((clientMode === "existing" && !!selectedClient) ||
+      (clientMode === "new" &&
+        newClient.firstName &&
+        newClient.lastName &&
+        newClient.documentNumber));
+
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+      <section className="rounded-[2rem] bg-white border border-slate-200 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+          <div>
+            <p className="text-sm uppercase tracking-[0.2em] text-sky-600">
+              Nueva venta
+            </p>
+            <h1 className="mt-2 text-3xl font-semibold text-slate-900">
+              Registro operativo de venta
+            </h1>
+            <p className="mt-2 text-slate-500">
+              Sigue el flujo real: cliente, pasajeros, resumen, confirmacion o cancelacion.
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <Link
+              href="/dashboard/sales"
+              className="rounded-2xl border border-slate-200 px-4 py-3 font-medium text-slate-700"
+            >
+              Menu ventas
+            </Link>
+            <button
+              onClick={() => setActiveModal("cancel")}
+              className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 font-medium text-rose-700"
+            >
+              Cancelar venta
+            </button>
+          </div>
+        </div>
+
         <div className="grid lg:grid-cols-[1.4fr_0.8fr]">
           <div className="p-6 lg:p-8 space-y-6">
-            <div>
-              <p className="text-sm uppercase tracking-[0.2em] text-sky-600">
-                Ventas
-              </p>
-              <h1 className="text-3xl font-semibold text-slate-900">
-                Nueva venta de pasajes
-              </h1>
-              <p className="text-slate-500 mt-2">
-                Registra clientes, carga pasajeros y confirma ventas con su resumen completo.
-              </p>
-            </div>
-
             <div className="grid md:grid-cols-[1fr_auto] gap-4">
               <div className="grid sm:grid-cols-2 gap-4">
                 <select
@@ -404,7 +445,7 @@ export function SalesWorkspace() {
 
               {items.map((item, index) => (
                 <div
-                  key={`${index}-${item.passengerFirstName}`}
+                  key={`${index}-${item.passengerFirstName}-${item.passengerLastName}`}
                   className="rounded-2xl border border-slate-200 p-5 space-y-4"
                 >
                   <div className="flex items-center justify-between">
@@ -519,7 +560,7 @@ export function SalesWorkspace() {
           <aside className="border-t lg:border-t-0 lg:border-l border-slate-200 bg-slate-50 p-6 lg:p-8 space-y-6">
             <div>
               <p className="text-sm uppercase tracking-[0.2em] text-slate-500">
-                Resumen
+                Resumen economico
               </p>
               <h2 className="text-2xl font-semibold text-slate-900">
                 Confirmacion de venta
@@ -529,16 +570,17 @@ export function SalesWorkspace() {
             <div className="space-y-4 rounded-2xl bg-white p-5 border border-slate-200">
               <div>
                 <p className="text-slate-400 text-sm">Cliente</p>
-                <p className="font-semibold text-slate-900">
-                  {selectedClient
-                    ? `${selectedClient.firstName} ${selectedClient.lastName}`
-                    : `${newClient.firstName || "-"} ${newClient.lastName || ""}`}
-                </p>
+                <p className="font-semibold text-slate-900">{customerName}</p>
               </div>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-slate-400">Fecha</p>
-                  <p className="font-medium text-slate-900">{saleDate}</p>
+                  <input
+                    type="date"
+                    value={saleDate}
+                    onChange={(e) => setSaleDate(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
+                  />
                 </div>
                 <div>
                   <p className="text-slate-400">Metodo</p>
@@ -587,13 +629,22 @@ export function SalesWorkspace() {
                 placeholder="Notas operativas de la venta"
                 className="min-h-28 rounded-2xl border border-slate-200 px-4 py-3"
               />
-              <button
-                onClick={() => void handleSubmit()}
-                disabled={submitting}
-                className="w-full rounded-2xl bg-slate-900 px-5 py-4 text-white font-medium disabled:opacity-70"
-              >
-                {submitting ? "Registrando venta..." : "Confirmar venta"}
-              </button>
+
+              <div className="grid gap-3">
+                <button
+                  onClick={() => setActiveModal("confirm")}
+                  disabled={!canSubmit || submitting}
+                  className="w-full rounded-2xl bg-slate-900 px-5 py-4 text-white font-medium disabled:opacity-60"
+                >
+                  {submitting ? "Registrando venta..." : "Revisar y confirmar"}
+                </button>
+                <button
+                  onClick={() => setActiveModal("cancel")}
+                  className="w-full rounded-2xl border border-slate-200 px-5 py-4 font-medium text-slate-700"
+                >
+                  Cancelar operacion
+                </button>
+              </div>
             </div>
 
             {error && (
@@ -604,14 +655,30 @@ export function SalesWorkspace() {
 
             {success && (
               <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-700">
-                {success}
+                <p>{success}</p>
+                {latestSaleId && (
+                  <div className="mt-3 flex gap-3 flex-wrap">
+                    <button
+                      onClick={() => router.push(`/dashboard/receipts/${latestSaleId}`)}
+                      className="rounded-xl bg-emerald-700 px-4 py-2 text-white font-medium"
+                    >
+                      Ver comprobante
+                    </button>
+                    <button
+                      onClick={() => setLatestSaleId(null)}
+                      className="rounded-xl border border-emerald-300 px-4 py-2 font-medium text-emerald-800"
+                    >
+                      Continuar trabajando
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </aside>
         </div>
       </section>
 
-      <section className="rounded-3xl bg-white border border-slate-200 shadow-sm overflow-hidden">
+      <section className="rounded-[2rem] bg-white border border-slate-200 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200">
           <div>
             <p className="text-sm uppercase tracking-[0.2em] text-sky-600">
@@ -621,6 +688,12 @@ export function SalesWorkspace() {
               Historial inmediato
             </h2>
           </div>
+          <Link
+            href="/dashboard/sales/list"
+            className="rounded-2xl border border-slate-200 px-4 py-3 font-medium text-slate-700"
+          >
+            Ver lista completa
+          </Link>
         </div>
 
         <div className="overflow-x-auto">
@@ -675,6 +748,88 @@ export function SalesWorkspace() {
           </table>
         </div>
       </section>
+
+      {activeModal === "confirm" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
+          <div className="w-full max-w-lg rounded-[2rem] bg-white p-8 shadow-2xl">
+            <p className="text-sm uppercase tracking-[0.2em] text-sky-600">
+              Confirmar venta
+            </p>
+            <h2 className="mt-3 text-3xl font-semibold text-slate-900">
+              Revisa antes de registrar
+            </h2>
+            <div className="mt-6 space-y-3 rounded-2xl bg-slate-50 p-5">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Cliente</span>
+                <span className="font-medium text-slate-900">{customerName}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Pasajeros</span>
+                <span className="font-medium text-slate-900">{items.length}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Total cliente</span>
+                <span className="font-medium text-slate-900">
+                  {formatMoney(totalClient)}
+                </span>
+              </div>
+            </div>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setActiveModal(null)}
+                className="flex-1 rounded-2xl border border-slate-200 px-5 py-3 font-medium text-slate-700"
+              >
+                Volver
+              </button>
+              <button
+                onClick={() => void handleConfirmSale()}
+                disabled={submitting}
+                className="flex-1 rounded-2xl bg-slate-900 px-5 py-3 font-medium text-white disabled:opacity-70"
+              >
+                {submitting ? "Guardando..." : "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeModal === "cancel" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
+          <div className="w-full max-w-lg rounded-[2rem] bg-white p-8 shadow-2xl">
+            <p className="text-sm uppercase tracking-[0.2em] text-rose-600">
+              Cancelar venta
+            </p>
+            <h2 className="mt-3 text-3xl font-semibold text-slate-900">
+              Deseas descartar esta operacion?
+            </h2>
+            <p className="mt-4 text-slate-500">
+              Si cancelas, se perderan los datos temporales cargados y no se registrara
+              ni la venta ni un cliente nuevo asociado a este intento.
+            </p>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={() => setActiveModal(null)}
+                className="flex-1 rounded-2xl border border-slate-200 px-5 py-3 font-medium text-slate-700"
+              >
+                Seguir editando
+              </button>
+              <button
+                onClick={() => {
+                  resetForm();
+                  setActiveModal(null);
+                  setError("");
+                  setSuccess("");
+                  setLatestSaleId(null);
+                  router.push("/dashboard/sales");
+                }}
+                className="flex-1 rounded-2xl bg-rose-600 px-5 py-3 font-medium text-white"
+              >
+                Cancelar venta
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

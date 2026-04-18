@@ -67,7 +67,8 @@ export function Sidebar() {
         <nav className="space-y-2 flex-1">
           {menu.map((item) => {
             const Icon = item.icon;
-            const active = pathname === item.path;
+            const active =
+              pathname === item.path || pathname.startsWith(`${item.path}/`);
 
             return (
               <button

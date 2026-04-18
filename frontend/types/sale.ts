@@ -88,3 +88,26 @@ export interface CreateSalePayload {
     commissionAmount: number | string;
   }>;
 }
+
+export interface WeeklyReport {
+  week: number;
+  year: number;
+  salesCount: number;
+  passengersCount: number;
+  revenue: number;
+  kovar: number;
+  commission: number;
+  salesByAgent: Array<{
+    userId: string;
+    name: string;
+    salesCount: number;
+    passengersCount: number;
+    revenue: number;
+    commission: number;
+  }>;
+  topDestinations: Array<{
+    route: string;
+    count: number;
+  }>;
+  recentSales: Sale[];
+}

@@ -1,5 +1,5 @@
-import { SalesWorkspace } from "@/features/sales/components/sales-workspace";
+import { SalesHub } from "@/features/sales/components/sales-hub";
 
 export default function SalesPage() {
-  return <SalesWorkspace />;
+  return <SalesHub />;
 }
