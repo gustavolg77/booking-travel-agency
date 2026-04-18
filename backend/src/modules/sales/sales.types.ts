@@ -36,6 +36,7 @@ export interface CreateSaleInput {
 export interface ListSalesFilters {
   status?: SaleStatus;
   userId?: string;
+  client?: string;
   year?: number;
   month?: number;
   week?: number;
@@ -45,5 +46,11 @@ export interface ListPassengersFilters {
   userId?: string;
   year?: number;
   month?: number;
+  week?: number;
+}
+
+export interface WeeklyReportFilters {
+  userId?: string;
+  year?: number;
   week?: number;
 }

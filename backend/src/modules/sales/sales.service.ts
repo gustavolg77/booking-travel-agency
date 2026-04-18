@@ -11,12 +11,29 @@ import {
   CreateSaleItemInput,
   ListPassengersFilters,
   ListSalesFilters,
+  WeeklyReportFilters,
 } from "./sales.types";
 
 function buildSaleWhere(filters: ListSalesFilters): Prisma.SaleWhereInput {
   return {
     ...(filters.status ? { status: filters.status } : {}),
     ...(filters.userId ? { userId: filters.userId } : {}),
+    ...(filters.client
+      ? {
+          client: {
+            OR: [
+              { firstName: { contains: filters.client, mode: "insensitive" } },
+              { lastName: { contains: filters.client, mode: "insensitive" } },
+              {
+                documentNumber: {
+                  contains: filters.client,
+                  mode: "insensitive",
+                },
+              },
+            ],
+          },
+        }
+      : {}),
     ...(filters.year || filters.month || filters.week
       ? {
           items: {
@@ -265,4 +282,103 @@ export async function listPassengers(filters: ListPassengersFilters) {
       },
     ],
   });
+}
+
+export async function getWeeklyReport(filters: WeeklyReportFilters) {
+  const now = new Date();
+  const selectedYear = filters.year || now.getFullYear();
+  const selectedWeek = filters.week || getDateParts(now).weekNumber;
+
+  const sales = await prisma.sale.findMany({
+    where: {
+      ...(filters.userId ? { userId: filters.userId } : {}),
+      items: {
+        some: {
+          yearNumber: selectedYear,
+          weekNumber: selectedWeek,
+        },
+      },
+    },
+    include: {
+      client: true,
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+        },
+      },
+      items: true,
+    },
+    orderBy: {
+      saleDate: "desc",
+    },
+  });
+
+  const salesCount = sales.length;
+  const passengersCount = sales.reduce(
+    (acc, sale) => acc + sale.passengerCount,
+    0
+  );
+  const revenue = sales.reduce((acc, sale) => acc + Number(sale.totalClient), 0);
+  const kovar = sales.reduce((acc, sale) => acc + Number(sale.totalKovar), 0);
+  const commission = sales.reduce(
+    (acc, sale) => acc + Number(sale.totalCommission),
+    0
+  );
+
+  const byAgent = new Map<
+    string,
+    {
+      userId: string;
+      name: string;
+      salesCount: number;
+      passengersCount: number;
+      revenue: number;
+      commission: number;
+    }
+  >();
+
+  const topDestinations = new Map<string, number>();
+
+  sales.forEach((sale) => {
+    const currentAgent = byAgent.get(sale.user.id) || {
+      userId: sale.user.id,
+      name: sale.user.name,
+      salesCount: 0,
+      passengersCount: 0,
+      revenue: 0,
+      commission: 0,
+    };
+
+    currentAgent.salesCount += 1;
+    currentAgent.passengersCount += sale.passengerCount;
+    currentAgent.revenue += Number(sale.totalClient);
+    currentAgent.commission += Number(sale.totalCommission);
+    byAgent.set(sale.user.id, currentAgent);
+
+    sale.items.forEach((item) => {
+      const route = `${item.routeOrigin} → ${item.routeDestination}`;
+      topDestinations.set(route, (topDestinations.get(route) || 0) + 1);
+    });
+  });
+
+  return {
+    week: selectedWeek,
+    year: selectedYear,
+    salesCount,
+    passengersCount,
+    revenue,
+    kovar,
+    commission,
+    salesByAgent: Array.from(byAgent.values()).sort(
+      (a, b) => b.revenue - a.revenue
+    ),
+    topDestinations: Array.from(topDestinations.entries())
+      .map(([route, count]) => ({ route, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5),
+    recentSales: sales.slice(0, 8),
+  };
 }

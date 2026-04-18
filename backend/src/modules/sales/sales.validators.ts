@@ -5,6 +5,7 @@ import {
   CreateSaleItemInput,
   ListPassengersFilters,
   ListSalesFilters,
+  WeeklyReportFilters,
 } from "./sales.types";
 
 function requiredText(value: unknown, fieldName: string) {
@@ -89,6 +90,7 @@ export function validateListSalesFilters(
         ? (query.status as SaleStatus)
         : undefined,
     userId: typeof query.userId === "string" ? query.userId : undefined,
+    client: typeof query.client === "string" ? query.client.trim() : undefined,
     year: parseNumber(query.year),
     month: parseNumber(query.month),
     week: parseNumber(query.week),
@@ -102,6 +104,16 @@ export function validateListPassengersFilters(
     userId: typeof query.userId === "string" ? query.userId : undefined,
     year: parseNumber(query.year),
     month: parseNumber(query.month),
+    week: parseNumber(query.week),
+  };
+}
+
+export function validateWeeklyReportFilters(
+  query: Record<string, unknown>
+): WeeklyReportFilters {
+  return {
+    userId: typeof query.userId === "string" ? query.userId : undefined,
+    year: parseNumber(query.year),
     week: parseNumber(query.week),
   };
 }

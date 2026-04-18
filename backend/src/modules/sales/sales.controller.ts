@@ -3,6 +3,7 @@ import { AuthRequest } from "../../shared/types/auth-request";
 import {
   createSale,
   getSaleById,
+  getWeeklyReport,
   listPassengers,
   listSales,
 } from "./sales.service";
@@ -10,6 +11,7 @@ import {
   validateCreateSaleInput,
   validateListPassengersFilters,
   validateListSalesFilters,
+  validateWeeklyReportFilters,
 } from "./sales.validators";
 
 export async function createSaleHandler(req: AuthRequest, res: Response) {
@@ -39,4 +41,13 @@ export async function listPassengersHandler(req: Request, res: Response) {
   const passengers = await listPassengers(filters);
 
   return res.status(200).json(passengers);
+}
+
+export async function getWeeklyReportHandler(req: Request, res: Response) {
+  const filters = validateWeeklyReportFilters(
+    req.query as Record<string, unknown>
+  );
+  const report = await getWeeklyReport(filters);
+
+  return res.status(200).json(report);
 }
