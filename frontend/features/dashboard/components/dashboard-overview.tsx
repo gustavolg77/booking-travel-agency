@@ -1,6 +1,8 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
+import { getStoredUser } from "@/lib/auth";
 
 const topDestinations = [
   { city: "Santa Cruz, BO", count: 92 },
@@ -15,6 +17,8 @@ const recentClients = [
 ];
 
 export function DashboardOverview() {
+  const user = getStoredUser();
+
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
@@ -23,7 +27,9 @@ export function DashboardOverview() {
         </h2>
 
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-600">Fernanda Caceres</span>
+          <span className="text-sm text-gray-600">
+            {user?.name || "Usuario interno"}
+          </span>
           <div className="w-10 h-10 bg-gray-300 rounded-full" />
         </div>
       </div>
@@ -104,16 +110,16 @@ export function DashboardOverview() {
             Acciones rapidas
           </h3>
 
-          <div className="flex justify-around">
-            <div className="text-center">
+          <div className="flex justify-around gap-4">
+            <Link href="/dashboard/sales" className="text-center">
               <div className="w-16 h-16 bg-blue-100 rounded-full mx-auto mb-2" />
               <p className="text-sm text-gray-600">Nueva venta</p>
-            </div>
+            </Link>
 
-            <div className="text-center">
+            <Link href="/dashboard/tickets" className="text-center">
               <div className="w-16 h-16 bg-teal-100 rounded-full mx-auto mb-2" />
               <p className="text-sm text-gray-600">Ver pasajes</p>
-            </div>
+            </Link>
           </div>
         </div>
 

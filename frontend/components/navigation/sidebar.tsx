@@ -4,6 +4,8 @@ import {
   LayoutDashboard,
   ShoppingCart,
   FileText,
+  Users,
+  Plane,
   Settings,
   LogOut,
   Menu,
@@ -17,6 +19,8 @@ import { clearSession } from "@/lib/auth";
 const menu = [
   { name: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
   { name: "Ventas", icon: ShoppingCart, path: "/dashboard/sales" },
+  { name: "Pasajes", icon: Plane, path: "/dashboard/tickets" },
+  { name: "Clientes", icon: Users, path: "/dashboard/clients" },
   { name: "Facturas", icon: FileText, path: "/dashboard/invoices" },
 ];
 

@@ -7,17 +7,178 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum Role {
+  ADMIN
+  AGENT
+}
+
+enum SaleStatus {
+  DRAFT
+  CONFIRMED
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  TRANSFER
+  QR
+  CARD
+  MIXED
+}
+
+enum DocumentType {
+  CI
+  PASSPORT
+  NIT
+  OTHER
+}
+
 model User {
   id        String   @id @default(uuid())
   name      String
   email     String   @unique
   password  String
   role      Role     @default(AGENT)
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  sales Sale[]
+
+  @@index([role])
+  @@index([isActive])
 }
 
-enum Role {
-  ADMIN
-  AGENT
+model Client {
+  id             String       @id @default(uuid())
+  firstName      String
+  lastName       String
+  documentType   DocumentType @default(CI)
+  documentNumber String
+  phone          String?
+  email          String?
+  nit            String?
+  businessName   String?
+  notes          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  sales Sale[]
+
+  @@unique([documentType, documentNumber])
+  @@index([lastName])
+  @@index([nit])
+}
+
+model Sale {
+  id              String         @id @default(uuid())
+  saleNumber      String         @unique
+  saleDate        DateTime       @default(now())
+  status          SaleStatus     @default(DRAFT)
+  clientId        String
+  userId          String
+  passengerCount  Int            @default(0)
+  subtotalClient  Decimal        @db.Decimal(12, 2)
+  totalClient     Decimal        @db.Decimal(12, 2)
+  totalKovar      Decimal        @db.Decimal(12, 2)
+  totalCommission Decimal        @db.Decimal(12, 2)
+  paymentMethod   PaymentMethod?
+  notes           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  client  Client    @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  user    User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  items   SaleItem[]
+  receipt Receipt?
+  invoice Invoice?
+
+  @@index([saleDate])
+  @@index([status])
+  @@index([clientId])
+  @@index([userId])
+  @@index([saleDate, userId])
+}
+
+model SaleItem {
+  id                 String       @id @default(uuid())
+  saleId             String
+  passengerFirstName String
+  passengerLastName  String
+  passengerDocType   DocumentType?
+  passengerDocNumber String?
+  routeOrigin        String
+  routeDestination   String
+  routeLabel         String?
+  issueDate          DateTime?
+  flightDate         DateTime?
+  ticketNumber       String?
+  airline            String?
+  amountClient       Decimal      @db.Decimal(12, 2)
+  amountKovar        Decimal      @db.Decimal(12, 2)
+  netAmount          Decimal      @db.Decimal(12, 2)
+  commissionAmount   Decimal      @db.Decimal(12, 2)
+  weekNumber         Int?
+  monthNumber        Int?
+  yearNumber         Int?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([saleId])
+  @@index([flightDate])
+  @@index([issueDate])
+  @@index([ticketNumber])
+  @@index([passengerLastName])
+  @@index([yearNumber, monthNumber, weekNumber])
+  @@index([routeOrigin, routeDestination])
+}
+
+model Receipt {
+  id                 String         @id @default(uuid())
+  saleId             String         @unique
+  receiptNumber      String         @unique
+  issuedAt           DateTime       @default(now())
+  clientName         String
+  clientNit          String?
+  clientBusinessName String?
+  totalAmount        Decimal        @db.Decimal(12, 2)
+  paymentMethod      PaymentMethod?
+  generatedPdfUrl    String?
+  createdAt          DateTime       @default(now())
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([issuedAt])
+}
+
+model Invoice {
+  id              String   @id @default(uuid())
+  saleId          String   @unique
+  invoiceNumber   String   @unique
+  issuedAt        DateTime @default(now())
+  nit             String
+  businessName    String
+  clientName      String
+  totalAmount     Decimal  @db.Decimal(12, 2)
+  cuf             String?
+  generatedPdfUrl String?
+  createdAt       DateTime @default(now())
+
+  sale Sale @relation(fields: [saleId], references: [id], onDelete: Cascade)
+
+  @@index([issuedAt])
+  @@index([nit])
+}
+
+model AgencySetting {
+  id         String   @id @default(uuid())
+  agencyName String
+  email      String?
+  phone      String?
+  address    String?
+  city       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
